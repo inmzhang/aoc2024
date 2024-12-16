@@ -8,12 +8,36 @@ pub fn process(input: &str) -> miette::Result<String> {
     let end: IVec2 = find_pos(&grid, 'E');
     let result =
         dijkstra(&start, |s| successor(s, &grid), |s| s.pos == end).expect("The path must exist");
+    // print_path(&grid, &result.0);
 
     Ok(result.1.to_string())
 }
 
+#[allow(dead_code)]
+fn print_path(grid: &[Vec<char>], path: &[State]) {
+    let mut grid = grid.to_vec();
+    for state in path {
+        grid[state.pos.y as usize][state.pos.x as usize] = state.direction.get_char();
+    }
+    for row in grid {
+        println!("{}", row.iter().collect::<String>());
+    }
+}
+
 fn successor(state: &State, grid: &[Vec<char>]) -> Vec<(State, usize)> {
-    todo!()
+    state
+        .direction
+        .reachable()
+        .into_iter()
+        .filter_map(|d| {
+            let new_pos = state.pos + d.get_ivec2();
+            if !can_move(new_pos, grid) {
+                return None;
+            }
+            let cost = if d == state.direction { 1 } else { 1001 };
+            Some((State::new(new_pos, d), cost))
+        })
+        .collect()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -36,8 +60,41 @@ enum Direction {
     Right,
 }
 
-fn in_bounds(pos: IVec2, grid: &[Vec<char>]) -> bool {
-    pos.x >= 0 && pos.x < grid[0].len() as i32 && pos.y >= 0 && pos.y < grid.len() as i32
+impl Direction {
+    fn reachable(&self) -> [Direction; 3] {
+        match self {
+            Self::Up => [Self::Left, Self::Up, Self::Right],
+            Self::Down => [Self::Right, Self::Down, Self::Left],
+            Self::Left => [Self::Down, Self::Left, Self::Up],
+            Self::Right => [Self::Up, Self::Right, Self::Down],
+        }
+    }
+
+    fn get_ivec2(&self) -> IVec2 {
+        match self {
+            Self::Up => IVec2::new(0, -1),
+            Self::Down => IVec2::new(0, 1),
+            Self::Left => IVec2::new(-1, 0),
+            Self::Right => IVec2::new(1, 0),
+        }
+    }
+
+    fn get_char(&self) -> char {
+        match self {
+            Self::Up => '^',
+            Self::Down => 'v',
+            Self::Left => '<',
+            Self::Right => '>',
+        }
+    }
+}
+
+fn can_move(pos: IVec2, grid: &[Vec<char>]) -> bool {
+    pos.x >= 0
+        && pos.x < grid[0].len() as i32
+        && pos.y >= 0
+        && pos.y < grid.len() as i32
+        && grid[pos.y as usize][pos.x as usize] != '#'
 }
 
 fn find_pos(grid: &[Vec<char>], c: char) -> IVec2 {
